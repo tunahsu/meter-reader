@@ -49,23 +49,33 @@ def digit_ocr(img):
     return(text)
 
 
-def get_circle(img, result, obj):
+def get_center(img, result, obj):
+    # 擷取物件區域
     img = img[obj['coord'][1]:obj['coord'][3], obj['coord'][0]:obj['coord'][2]]
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    blur = cv2.medianBlur(gray, 5)
-    circles = cv2.HoughCircles(blur, cv2.HOUGH_GRADIENT, 1, 100, param1=50, param2=200, minRadius=100, maxRadius=600)
-    circles = np.uint16(np.around(circles))
 
-    for i in circles[0]:
-        # 因處理圖片只取電表區塊 座標需再作補正
-        center_coord = [obj['coord'][0] + i[0], obj['coord'][1] + i[1]]
-        center_radius = i[2]
+    if obj['class'] == 1:
+        height, width, _ = img.shape
+        center_coord = [int(obj['coord'][0] + width * 0.75), int(obj['coord'][1] + height * 0.75)]
 
+    elif obj['class'] == 2:
+        height, width, _ = img.shape
+        center_coord = [int(obj['coord'][0] + width * 0.5), int(obj['coord'][1] + height * 1.2)]
+
+    elif obj['class'] == 3:
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        blur = cv2.medianBlur(gray, 5)
+        circles = cv2.HoughCircles(blur, cv2.HOUGH_GRADIENT, 1, 100, param1=50, param2=200, minRadius=100, maxRadius=600)
+        circles = np.uint16(np.around(circles))
+        circle = circles[0][0]
+
+        # 座標校正
+        center_coord = [obj['coord'][0] + circle[0], obj['coord'][1] + circle[1]]
+        center_radius = circle[2]
         # 畫圓
         cv2.circle(result,(center_coord[0], center_coord[1]), center_radius, (0, 255, 0), 2)
-        # 畫圓心
-        cv2.circle(result, (center_coord[0], center_coord[1]), 2, (0, 0, 255), 2)
 
+    # 畫圓心
+    cv2.circle(result, (center_coord[0], center_coord[1]), 2, (0, 0, 255), 2)
     return center_coord
 
 
@@ -90,9 +100,14 @@ def get_pointer(img, result, obj, center_coord):
         x2 += obj['coord'][0]
         y2 += obj['coord'][1]
 
-        # 點取直線中心點
-        pt1 = [int((x1 + x2) / 2), int((y1 + y2) / 2)]
-        pt2 = center_coord
+        # 取離圓心遠的點
+        pt1 = [x1, y1]
+        pt2 = [x2, y2]
+        diff1 = ((pt1[0] - center_coord[0]) ** 2 + (pt1[1] - center_coord[1]) ** 2) ** 0.5
+        diff2 = ((pt2[0] - center_coord[0]) ** 2 + (pt2[1] - center_coord[1]) ** 2) ** 0.5
+        
+        pt1 = pt1 if diff1 > diff2 else pt2
+        pt2 =  center_coord
 
         # 計算角度
         angle = int((np.degrees(np.arctan2((pt1[1] - pt2[1]), (pt1[0] - pt2[0]))) + 270) % 360)
@@ -105,14 +120,14 @@ def get_pointer(img, result, obj, center_coord):
 
 def meter_read(img, obj_list):  
     for obj in obj_list:
-        if obj['class'] == 4: # 若物件類別為 gauge
+        if obj['class'] in [1, 2, 3, 4]: # 若物件類別為電表
             result = img.copy()
 
             # 獲取指針、圓
-            center_coord = get_circle(img, result, obj)
+            center_coord = get_center(img, result, obj)
             pointer_angle = get_pointer(img, result, obj, center_coord)
 
-            # 只取一個類別為 gauge 的物件
+            # 只取一個電表
             break
 
     # 獲取每個數值相對應的角度
