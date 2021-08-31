@@ -44,7 +44,7 @@ def digit_ocr(img):
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     ret, thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY)
     text = pytesseract.image_to_string(thresh, lang='eng', config='--psm 6 --oem 3 -c tessedit_char_whitelist=0123456789').strip()
-    # show_img('Thresh', thresh)
+    show_img('Thresh', thresh)
     # print(text)
     return(text)
 
@@ -55,7 +55,7 @@ def get_center(img, result, obj):
 
     if obj['class'] == 1:
         height, width, _ = img.shape
-        center_coord = [int(obj['coord'][0] + width * 0.75), int(obj['coord'][1] + height * 0.75)]
+        center_coord = [int(obj['coord'][0] + width * 0.9), int(obj['coord'][1] + height * 0.9)]
 
     elif obj['class'] == 2:
         height, width, _ = img.shape
@@ -82,40 +82,47 @@ def get_center(img, result, obj):
 def get_pointer(img, result, obj, center_coord):
     img = img[obj['coord'][1]:obj['coord'][3], obj['coord'][0]:obj['coord'][2]]
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    guassian = cv2.GaussianBlur(gray, (9, 9), 0)
-    ret, thresh = cv2.threshold(guassian, 150, 255, cv2.THRESH_BINARY)
+    blur = cv2.GaussianBlur(gray, (3, 3), 0)
+    ret, thresh = cv2.threshold(blur, 150, 255, cv2.THRESH_BINARY)
     # thresh = cv2.adaptiveThreshold(guassian, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 17, 15)
     edges = cv2.Canny(thresh, 100, 150)
 
-    # show_img('Thresh', thresh)
-    # show_img('Edges', edges)
+    show_img('Gray', gray)
+    show_img('Blur', blur)
+    show_img('Thresh', thresh)
+    show_img('Edges', edges)
 
     # 找直線
-    lines = cv2.HoughLinesP(edges, 1, np.pi / 180, 100, lines=np.array([]), minLineLength=50, maxLineGap=5)
+    lines = cv2.HoughLinesP(edges, 1, np.pi / 180, 100, lines=np.array([]), minLineLength=25, maxLineGap=10)
     
-    for x1, y1, x2, y2 in lines[0]:
-        # 因處理圖片只取電表區塊 座標需再作補正
-        x1 += obj['coord'][0]
-        y1 += obj['coord'][1]
-        x2 += obj['coord'][0]
-        y2 += obj['coord'][1]
+    if lines is not None:
+        for x1, y1, x2, y2 in lines[0]:
+            # 因處理圖片只取電表區塊 座標需再作補正
+            x1 += obj['coord'][0]
+            y1 += obj['coord'][1]
+            x2 += obj['coord'][0]
+            y2 += obj['coord'][1]
 
-        # 取離圓心遠的點
-        pt1 = [x1, y1]
-        pt2 = [x2, y2]
-        diff1 = ((pt1[0] - center_coord[0]) ** 2 + (pt1[1] - center_coord[1]) ** 2) ** 0.5
-        diff2 = ((pt2[0] - center_coord[0]) ** 2 + (pt2[1] - center_coord[1]) ** 2) ** 0.5
-        
-        pt1 = pt1 if diff1 > diff2 else pt2
-        pt2 =  center_coord
+            # 取離圓心遠的點
+            pt1 = [x1, y1]
+            pt2 = [x2, y2]
+            diff1 = ((pt1[0] - center_coord[0]) ** 2 + (pt1[1] - center_coord[1]) ** 2) ** 0.5
+            diff2 = ((pt2[0] - center_coord[0]) ** 2 + (pt2[1] - center_coord[1]) ** 2) ** 0.5
+            
+            pt1 = pt1 if diff1 > diff2 else pt2
+            pt2 =  center_coord
 
-        # 計算角度
-        angle = int((np.degrees(np.arctan2((pt1[1] - pt2[1]), (pt1[0] - pt2[0]))) + 270) % 360)
+            # 計算角度
+            angle = int((np.degrees(np.arctan2((pt1[1] - pt2[1]), (pt1[0] - pt2[0]))) + 270) % 360)
+            print('pointer angle:{}'.format(angle))
 
-        # 畫線
-        cv2.line(result, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            # 畫線
+            cv2.line(result, (x1, y1), (x2, y2), (0, 255, 0), 2)
 
-    return angle 
+        return angle
+    
+    print('未偵測到任何指針')
+    return None
 
 
 def meter_read(img, obj_list):  
@@ -129,37 +136,37 @@ def meter_read(img, obj_list):
 
             # 只取一個電表
             break
+    if pointer_angle is not None:
+        # 獲取每個數值相對應的角度
+        value_list = []
+        for obj in obj_list:
+            if obj['class'] == 0: # 若物件類別為數值才做計算
+                # 文字辨識
+                value_img = img[obj['coord'][1]:obj['coord'][3], obj['coord'][0]:obj['coord'][2]]
+                value_text = digit_ocr(value_img)
 
-    # 獲取每個數值相對應的角度
-    value_list = []
-    for obj in obj_list:
-        if obj['class'] == 0: # 若物件類別為數值才做計算
-            # 文字辨識
-            value_img = img[obj['coord'][1]:obj['coord'][3], obj['coord'][0]:obj['coord'][2]]
-            value_text = digit_ocr(value_img)
+                # 抓出來的文字為數值才做計算
+                if(value_text.isdigit()):
+                    pt1 = [int((obj['coord'][0] + obj['coord'][2]) / 2), int((obj['coord'][1] + obj['coord'][3]) / 2)]
+                    pt2 = center_coord
 
-            # 抓出來的文字為數值才做計算
-            if(value_text.isdigit()):
-                pt1 = [int((obj['coord'][0] + obj['coord'][2]) / 2), int((obj['coord'][1] + obj['coord'][3]) / 2)]
-                pt2 = center_coord
+                    rho = (((pt1[0] - pt2[0]) ** 2) + ((pt1[1] - pt2[1]) ** 2)) ** 0.5
+                    angle = int((np.degrees(np.arctan2((pt1[1] - pt2[1]), (pt1[0] - pt2[0]))) + 270) % 360)
 
-                rho = (((pt1[0] - pt2[0]) ** 2) + ((pt1[1] - pt2[1]) ** 2)) ** 0.5
-                angle = int((np.degrees(np.arctan2((pt1[1] - pt2[1]), (pt1[0] - pt2[0]))) + 270) % 360)
+                    value = int(value_text)
+                    value_list.append({'value': value, 'angle': angle})
 
-                value = int(value_text)
-                value_list.append({'value': value, 'angle': angle})
+                    cv2.putText(result, '{}/{}'.format(value, str(angle)), (obj['coord'][0], obj['coord'][1]), cv2.FONT_HERSHEY_SIMPLEX, .5, (0, 255, 0), 1, cv2.LINE_AA)
 
-                cv2.putText(result, '{}/{}'.format(value, str(angle)), (obj['coord'][0], obj['coord'][1]), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2, cv2.LINE_AA)
+        # 獲取指針相對應的數值 取最大的兩個數值做計算
+        value_list = sorted(value_list, key=itemgetter('value'), reverse=True)
+        print(value_list)
+        angle_diff = value_list[0]['angle'] - value_list[-1]['angle']
+        value_diff = value_list[0]['value'] - value_list[-1]['value']
+        pointer_value = value_list[0]['value'] - (value_list[0]['angle'] - pointer_angle) * (value_diff / angle_diff)
 
-    # 獲取指針相對應的數值 取最大的兩個數值做計算
-    value_list = sorted(value_list, key=itemgetter('value'), reverse=True)
-    print(value_list)
-    angle_diff = value_list[0]['angle'] - value_list[1]['angle']
-    value_diff = value_list[0]['value'] - value_list[1]['value']
-    pointer_value = value_list[0]['value'] - (value_list[0]['angle'] - pointer_angle) * (value_diff / angle_diff)
-
-    cv2.putText(result, 'predicted value:{}'.format(str(pointer_value)), (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2, cv2.LINE_AA)
-    show_img('img', result)
+        cv2.putText(result, 'predicted value:{}'.format(str(pointer_value)), (50, 50), cv2.FONT_HERSHEY_SIMPLEX, .5, (0, 255, 0), 1, cv2.LINE_AA)
+        show_img('img', result)
     return result
 
 
