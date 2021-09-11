@@ -1,0 +1,1 @@
+Download weights file of meter detection: https://drive.google.com/file/d/1Rd21VkKpnf2mT9FQ-xl5pqCvkKPhxcfa/view?usp=sharing
