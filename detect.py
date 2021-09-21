@@ -68,7 +68,7 @@ def get_center(img, result, obj):
         circle = circles[0][0]
 
         # 座標校正
-        center_coord = [obj['coord'][0] + circle[0], obj['coord'][1] + circle[1]]
+        center_coord = [int(obj['coord'][0] + circle[0]), int(obj['coord'][1] + circle[1])]
         center_radius = circle[2]
         # 畫圓
         cv2.circle(result,(center_coord[0], center_coord[1]), center_radius, (0, 255, 0), 2)
@@ -78,50 +78,75 @@ def get_center(img, result, obj):
     return center_coord
 
 
-def get_pointer(img, result, obj, center_coord):
-    img = img[obj['coord'][1]:obj['coord'][3], obj['coord'][0]:obj['coord'][2]]
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    blur = cv2.GaussianBlur(gray, (3, 3), 0)
-    ret, thresh = cv2.threshold(blur, 150, 255, cv2.THRESH_BINARY)
-    # thresh = cv2.adaptiveThreshold(guassian, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 17, 15)
-    edges = cv2.Canny(thresh, 100, 150)
+def get_pointer_values(img, polar_img, obj_list, center_coord):
+    value_list = []
+    value_xlist = []
+    value_ylist = []
+    for obj in obj_list:
+        if obj['class'] == 0: # 若物件類別為數值才做計算
+            # 文字辨識
+            value_img = img[obj['coord'][1]:obj['coord'][3], obj['coord'][0]:obj['coord'][2]]
+            value_text = digit_ocr(value_img)
 
-    # show_img('Gray', gray)
-    # show_img('Blur', blur)
-    # show_img('Thresh', thresh)
-    # show_img('Edges', edges)
+            # 抓出來的文字為數值才做計算
+            if(value_text.isdigit()):
+                # 將數值物件左上/下、右上/下座標通通抓出來
+                polar_x1 = get_polar_coord(polar_img, center_coord, [obj['coord'][0], obj['coord'][1]])
+                polar_x2 = get_polar_coord(polar_img, center_coord, [obj['coord'][2], obj['coord'][1]])
+                polar_y1 = get_polar_coord(polar_img, center_coord, [obj['coord'][0], obj['coord'][3]])
+                polar_y2 = get_polar_coord(polar_img, center_coord, [obj['coord'][2], obj['coord'][3]])
+                value_xlist.extend([polar_x1[1], polar_x2[1], polar_y1[1], polar_y2[1]])
+                value_ylist.extend([polar_x1[0], polar_x2[0], polar_y1[0], polar_y2[0]])
 
-    # 找直線
-    lines = cv2.HoughLinesP(edges, 1, np.pi / 180, 100, lines=np.array([]), minLineLength=25, maxLineGap=10)
+                # 獲取數值物件的Y軸位置
+                value_pos = get_polar_coord(polar_img, center_coord, [(obj['coord'][0] + obj['coord'][2]) / 2, (obj['coord'][1] + obj['coord'][3]) / 2])[0]
+                value_list.append([int(value_text), value_pos])
+
+    min_x = min(value_xlist)
+    max_x = max(value_xlist)
+    width = max_x - min_x
+    min_y = min(value_ylist)
+    max_y = max(value_ylist)
     
-    if lines is not None:
-        for x1, y1, x2, y2 in lines[0]:
-            # 因處理圖片只取電表區塊 座標需再作補正
-            x1 += obj['coord'][0]
-            y1 += obj['coord'][1]
-            x2 += obj['coord'][0]
-            y2 += obj['coord'][1]
-
-            # 取離圓心遠的點
-            pt1 = [x1, y1]
-            pt2 = [x2, y2]
-            diff1 = ((pt1[0] - center_coord[0]) ** 2 + (pt1[1] - center_coord[1]) ** 2) ** 0.5
-            diff2 = ((pt2[0] - center_coord[0]) ** 2 + (pt2[1] - center_coord[1]) ** 2) ** 0.5
-            
-            pt1 = pt1 if diff1 > diff2 else pt2
-            pt2 =  center_coord
-
-            # 計算角度
-            angle = int((np.degrees(np.arctan2((pt1[1] - pt2[1]), (pt1[0] - pt2[0]))) + 270) % 360)
-            print('pointer angle:{}'.format(angle))
-
-            # 畫線
-            cv2.line(result, (x1, y1), (x2, y2), (0, 255, 0), 2)
-
-        return angle
+    # 截出感興趣的區域
+    polar_crop = polar_img[min_y:max_y, min_x - width:max_x]
+    polar_gray = cv2.cvtColor(polar_crop, cv2.COLOR_BGR2GRAY)
+    ret, polar_thresh = cv2.threshold(polar_gray, 150, 255, cv2.THRESH_BINARY)
     
-    print('未偵測到任何指針')
-    return None
+    # 透過累加器取出黑色pixel最多的列
+    max_acc = 0
+    for i in range(polar_thresh.shape[0]):
+        acc = 0
+        for j in range(polar_thresh.shape[1]):
+            if polar_thresh[i][j] == 0:
+                acc += 1
+        if acc > max_acc:
+            max_acc = acc
+            pointer_pos = i
+
+    cv2.line(polar_crop, (0, pointer_pos), (polar_crop.shape[1], pointer_pos), (0, 255, 0), 2)
+
+    # 根據感興趣的區塊對數值物件的Y軸位置做校正
+    for i in range(len(value_list)):
+        value_list[i][1] -= min_y
+        cv2.line(polar_crop, (0, value_list[i][1]), (polar_crop.shape[1], value_list[i][1]), (0, 255, 0), 1)
+
+    show_img('Pointer', polar_crop)
+    return pointer_pos, sorted(value_list, key=itemgetter(1))
+
+
+def get_polar_img(img, center_coord):
+    height, width, _ = img.shape
+    polar_img = cv2.linearPolar(img, (center_coord[0], center_coord[1]), max(width, height), cv2.INTER_LINEAR + cv2.WARP_FILL_OUTLIERS)
+    return polar_img
+
+
+def get_polar_coord(polar_img, center_coord, coord):
+    rho = (((coord[0] - center_coord[0]) ** 2) + ((coord[1] - center_coord[1]) ** 2)) ** 0.5
+    angle = int((np.degrees(np.arctan2((coord[1] - center_coord[1]), (coord[0] - center_coord[0]))) + 360) % 360)
+    height, width, _ = polar_img.shape
+    polar_coord = [int(height * (angle / 360)), int(rho)]
+    return polar_coord
 
 
 def meter_read(img, obj_list):  
@@ -131,32 +156,43 @@ def meter_read(img, obj_list):
 
             # 獲取指針、圓
             center_coord = get_center(img, result, obj)
-            pointer_angle = get_pointer(img, result, obj, center_coord)
+            polar_img = get_polar_img(img, center_coord)
+            pointer_pos, value_list = get_pointer_values(img, polar_img, obj_list, center_coord)
+            print(pointer_pos)
+            print(value_list)
 
+            value1 = None
+            value2 = None
+            for i in range(len(value_list)):
+                if value_list[i][1] < pointer_pos:
+                    value1 = value_list[i]
+                if value_list[i][1] > pointer_pos:
+                    value2 = value_list[i]
+
+            if (value1 is None) and (value2 is not None):
+                value1 = value_list[0]
+                value2 = value_list[1]
+            elif (value1 is not None) and (value2 is None):
+                value1 = value_list[-2]
+                value2 = value_list[-1]
+            elif (value1 is None) and (value2 is None):
+                print('無法辨識此電表')
+                break
+
+            scale_per_pixel = (value2[0] - value1[0]) / (value2[1] - value1[1])
+            value0 = [value1[0] + (pointer_pos - value1[1]) * scale_per_pixel, pointer_pos]
+            
+            print(value0)
             # 只取一個電表
-            break
-    if pointer_angle is not None:
-        # 獲取每個數值相對應的角度
-        value_list = []
-        for obj in obj_list:
-            if obj['class'] == 0: # 若物件類別為數值才做計算
-                # 文字辨識
-                value_img = img[obj['coord'][1]:obj['coord'][3], obj['coord'][0]:obj['coord'][2]]
-                value_text = digit_ocr(value_img)
+            break  
 
-                # 抓出來的文字為數值才做計算
-                if(value_text.isdigit()):
-                    pt1 = [int((obj['coord'][0] + obj['coord'][2]) / 2), int((obj['coord'][1] + obj['coord'][3]) / 2)]
-                    pt2 = center_coord
+            '''
+            value = int(value_text)
+            value_list.append({'value': value, 'angle': angle})
 
-                    rho = (((pt1[0] - pt2[0]) ** 2) + ((pt1[1] - pt2[1]) ** 2)) ** 0.5
-                    angle = int((np.degrees(np.arctan2((pt1[1] - pt2[1]), (pt1[0] - pt2[0]))) + 270) % 360)
-
-                    value = int(value_text)
-                    value_list.append({'value': value, 'angle': angle})
-
-                    cv2.putText(result, '{}/{}'.format(value, str(angle)), (obj['coord'][0], obj['coord'][1]), cv2.FONT_HERSHEY_SIMPLEX, .5, (0, 255, 0), 1, cv2.LINE_AA)
-
+            cv2.putText(result, '{}/{}'.format(value, str(angle)), (obj['coord'][0], obj['coord'][1]), cv2.FONT_HERSHEY_SIMPLEX, .5, (0, 255, 0), 1, cv2.LINE_AA)
+            '''
+        '''
         # 獲取指針相對應的數值 取最大的兩個數值做計算
         value_list = sorted(value_list, key=itemgetter('value'), reverse=True)
         print(value_list)
@@ -165,7 +201,8 @@ def meter_read(img, obj_list):
         pointer_value = value_list[0]['value'] - (value_list[0]['angle'] - pointer_angle) * (value_diff / angle_diff)
 
         cv2.putText(result, 'predicted value:{}'.format(str(pointer_value)), (50, 50), cv2.FONT_HERSHEY_SIMPLEX, .5, (0, 255, 0), 1, cv2.LINE_AA)
-        show_img('img', result)
+        '''
+    # show_img('img', result)
     return result
 
 
