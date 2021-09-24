@@ -48,30 +48,51 @@ def digit_ocr(img):
     return(text)
 
 
-def get_center(img, result, obj):
+def get_center(img, result, obj, obj_list):
     # 擷取物件區域
     img = img[obj['coord'][1]:obj['coord'][3], obj['coord'][0]:obj['coord'][2]]
 
-    if obj['class'] == 1:
-        height, width, _ = img.shape
-        center_coord = [int(obj['coord'][0] + width * 0.9), int(obj['coord'][1] + height * 0.9)]
+    # if obj['class'] == 1:
+    # height, width, _ = img.shape
+    # center_coord = [int(obj['coord'][0] + width * 0.9), int(obj['coord'][1] + height * 0.9)]
+    value_list = [value for value in obj_list if value['class'] == 0]
 
-    elif obj['class'] == 2:
-        height, width, _ = img.shape
-        center_coord = [int(obj['coord'][0] + width * 0.5), int(obj['coord'][1] + height * 1.2)]
+    pt1 = [(value_list[0]['coord'][0] + value_list[0]['coord'][0]) / 2, (value_list[0]['coord'][1] + value_list[0]['coord'][3]) / 2]
+    pt2 = [(value_list[1]['coord'][0] + value_list[1]['coord'][0]) / 2, (value_list[1]['coord'][1] + value_list[1]['coord'][3]) / 2]
+    pt3 = [(value_list[2]['coord'][0] + value_list[2]['coord'][0]) / 2, (value_list[2]['coord'][1] + value_list[2]['coord'][3]) / 2]
 
-    elif obj['class'] == 3:
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        blur = cv2.medianBlur(gray, 5)
-        circles = cv2.HoughCircles(blur, cv2.HOUGH_GRADIENT, 1, 100, param1=50, param2=200, minRadius=100, maxRadius=600)
-        circles = np.uint16(np.around(circles))
-        circle = circles[0][0]
+    v21 = [pt2[0] - pt1[0], pt2[1] - pt1[1]]
+    pt21 = [(pt2[0] + pt1[0]) / 2, (pt2[1] + pt1[1]) / 2]
+    c1 = v21[0] * pt21[0] + v21[1] * pt21[1]
 
-        # 座標校正
-        center_coord = [int(obj['coord'][0] + circle[0]), int(obj['coord'][1] + circle[1])]
-        center_radius = circle[2]
-        # 畫圓
-        cv2.circle(result,(center_coord[0], center_coord[1]), center_radius, (0, 255, 0), 2)
+    v32 = [pt3[0] - pt2[0], pt3[1] - pt2[1]]
+    pt32 = [(pt3[0] + pt2[0]) / 2, (pt3[1] + pt2[1]) / 2]
+    c2 = v32[0] * pt32[0] + v32[1] * pt32[1]            
+
+    A = np.array([[v21[0], v21[1]], [v32[0], v32[1]]])
+    B = np.array([c1, c2])
+    A_inv = np.linalg.inv(A)
+    ans = A_inv.dot(B)
+
+    center_coord = [int(ans[0]), int(ans[1])]    
+            
+
+    # elif obj['class'] == 2:
+    #     height, width, _ = img.shape
+    #     center_coord = [int(obj['coord'][0] + width * 0.5), int(obj['coord'][1] + height * 1.2)]
+
+    # elif obj['class'] == 3:
+    #     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    #     blur = cv2.medianBlur(gray, 5)
+    #     circles = cv2.HoughCircles(blur, cv2.HOUGH_GRADIENT, 1, 100, param1=50, param2=200, minRadius=100, maxRadius=600)
+    #     circles = np.uint16(np.around(circles))
+    #     circle = circles[0][0]
+
+    #     # 座標校正
+    #     center_coord = [int(obj['coord'][0] + circle[0]), int(obj['coord'][1] + circle[1])]
+    #     center_radius = circle[2]
+    #     # 畫圓
+    #     cv2.circle(result,(center_coord[0], center_coord[1]), center_radius, (0, 255, 0), 2)
 
     # 畫圓心
     cv2.circle(result, (center_coord[0], center_coord[1]), 2, (0, 0, 255), 2)
@@ -104,12 +125,12 @@ def get_pointer_values(img, polar_img, obj_list, center_coord):
 
     min_x = min(value_xlist)
     max_x = max(value_xlist)
-    width = max_x - min_x
+    # width = max_x - min_x
     min_y = min(value_ylist)
     max_y = max(value_ylist)
     
     # 截出感興趣的區域
-    polar_crop = polar_img[min_y:max_y, min_x - width:max_x]
+    polar_crop = polar_img[min_y:max_y, min_x:max_x]
     polar_gray = cv2.cvtColor(polar_crop, cv2.COLOR_BGR2GRAY)
     ret, polar_thresh = cv2.threshold(polar_gray, 150, 255, cv2.THRESH_BINARY)
     
@@ -124,15 +145,14 @@ def get_pointer_values(img, polar_img, obj_list, center_coord):
             max_acc = acc
             pointer_pos = i
 
-    cv2.line(polar_crop, (0, pointer_pos), (polar_crop.shape[1], pointer_pos), (0, 255, 0), 2)
+    cv2.line(polar_crop, (0, pointer_pos), (polar_crop.shape[1], pointer_pos), (0, 0, 255), 2)
 
     # 根據感興趣的區塊對數值物件的Y軸位置做校正
     for i in range(len(value_list)):
         value_list[i][1] -= min_y
-        cv2.line(polar_crop, (0, value_list[i][1]), (polar_crop.shape[1], value_list[i][1]), (0, 255, 0), 1)
+        cv2.line(polar_crop, (0, value_list[i][1]), (polar_crop.shape[1], value_list[i][1]), (0, 255, 0), 2)
 
-    show_img('Pointer', polar_crop)
-    return pointer_pos, sorted(value_list, key=itemgetter(1))
+    return polar_crop, pointer_pos, sorted(value_list, key=itemgetter(0))
 
 
 def get_polar_img(img, center_coord):
@@ -155,34 +175,28 @@ def meter_read(img, obj_list):
             result = img.copy()
 
             # 獲取指針、圓
-            center_coord = get_center(img, result, obj)
+            center_coord = get_center(img, result, obj, obj_list)
             polar_img = get_polar_img(img, center_coord)
-            pointer_pos, value_list = get_pointer_values(img, polar_img, obj_list, center_coord)
+            polar_crop, pointer_pos, value_list = get_pointer_values(img, polar_img, obj_list, center_coord)
             print(pointer_pos)
             print(value_list)
 
             value1 = None
             value2 = None
             for i in range(len(value_list)):
-                if value_list[i][1] < pointer_pos:
-                    value1 = value_list[i]
                 if value_list[i][1] > pointer_pos:
+                    value1 = value_list[i]
+                    value2 = value_list[i + 1]
+                    break
+            for i in range(len(value_list)):
+                if value_list[i][1] < pointer_pos and (value1[0] - value_list[i][0]) > 0:
                     value2 = value_list[i]
-
-            if (value1 is None) and (value2 is not None):
-                value1 = value_list[0]
-                value2 = value_list[1]
-            elif (value1 is not None) and (value2 is None):
-                value1 = value_list[-2]
-                value2 = value_list[-1]
-            elif (value1 is None) and (value2 is None):
-                print('無法辨識此電表')
-                break
 
             scale_per_pixel = (value2[0] - value1[0]) / (value2[1] - value1[1])
             value0 = [value1[0] + (pointer_pos - value1[1]) * scale_per_pixel, pointer_pos]
             
-            print(value0)
+            print(value1, value2, value0)
+            show_img('Polar crop', polar_crop)
             # 只取一個電表
             break  
 
@@ -203,7 +217,7 @@ def meter_read(img, obj_list):
         cv2.putText(result, 'predicted value:{}'.format(str(pointer_value)), (50, 50), cv2.FONT_HERSHEY_SIMPLEX, .5, (0, 255, 0), 1, cv2.LINE_AA)
         '''
     # show_img('img', result)
-    return result
+    return polar_crop
 
 
 def main(_argv):
@@ -271,7 +285,7 @@ def main(_argv):
         x2 = int(box[3] * original_image.shape[1])
         obj_class = int(classes.numpy()[0][i])
         obj_list.append({'class': obj_class, 'coord': [x1, y1, x2, y2]})
-    result = meter_read(original_image, obj_list)
+    polar_crop = meter_read(original_image, obj_list)
 
     image = utils.draw_bbox(original_image, pred_bbox)
     # image = utils.draw_bbox(image_data*255, pred_bbox)
