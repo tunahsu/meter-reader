@@ -48,55 +48,53 @@ def digit_ocr(img):
     return(text)
 
 
-def get_center(img, result, obj, obj_list):
+def get_center(img, obj, obj_list):
     # 擷取物件區域
+    center_img = img.copy()
     img = img[obj['coord'][1]:obj['coord'][3], obj['coord'][0]:obj['coord'][2]]
 
-    # if obj['class'] == 1:
-    # height, width, _ = img.shape
-    # center_coord = [int(obj['coord'][0] + width * 0.9), int(obj['coord'][1] + height * 0.9)]
-    value_list = [value for value in obj_list if value['class'] == 0]
+    if obj['class'] in [1, 2]:
+        # 任取圓上三點計算圓心
+        value_list = [value for value in obj_list if value['class'] == 0]
+        pt1 = [(value_list[0]['coord'][0] + value_list[0]['coord'][0]) / 2, (value_list[0]['coord'][1] + value_list[0]['coord'][3]) / 2]
+        pt2 = [(value_list[1]['coord'][0] + value_list[1]['coord'][0]) / 2, (value_list[1]['coord'][1] + value_list[1]['coord'][3]) / 2]
+        pt3 = [(value_list[2]['coord'][0] + value_list[2]['coord'][0]) / 2, (value_list[2]['coord'][1] + value_list[2]['coord'][3]) / 2]
 
-    pt1 = [(value_list[0]['coord'][0] + value_list[0]['coord'][0]) / 2, (value_list[0]['coord'][1] + value_list[0]['coord'][3]) / 2]
-    pt2 = [(value_list[1]['coord'][0] + value_list[1]['coord'][0]) / 2, (value_list[1]['coord'][1] + value_list[1]['coord'][3]) / 2]
-    pt3 = [(value_list[2]['coord'][0] + value_list[2]['coord'][0]) / 2, (value_list[2]['coord'][1] + value_list[2]['coord'][3]) / 2]
+        v21 = [pt2[0] - pt1[0], pt2[1] - pt1[1]]
+        pt21 = [(pt2[0] + pt1[0]) / 2, (pt2[1] + pt1[1]) / 2]
+        c1 = v21[0] * pt21[0] + v21[1] * pt21[1]
 
-    v21 = [pt2[0] - pt1[0], pt2[1] - pt1[1]]
-    pt21 = [(pt2[0] + pt1[0]) / 2, (pt2[1] + pt1[1]) / 2]
-    c1 = v21[0] * pt21[0] + v21[1] * pt21[1]
+        v32 = [pt3[0] - pt2[0], pt3[1] - pt2[1]]
+        pt32 = [(pt3[0] + pt2[0]) / 2, (pt3[1] + pt2[1]) / 2]
+        c2 = v32[0] * pt32[0] + v32[1] * pt32[1]            
 
-    v32 = [pt3[0] - pt2[0], pt3[1] - pt2[1]]
-    pt32 = [(pt3[0] + pt2[0]) / 2, (pt3[1] + pt2[1]) / 2]
-    c2 = v32[0] * pt32[0] + v32[1] * pt32[1]            
+        A = np.array([[v21[0], v21[1]], [v32[0], v32[1]]])
+        B = np.array([c1, c2])
+        A_inv = np.linalg.inv(A)
+        ans = A_inv.dot(B)
 
-    A = np.array([[v21[0], v21[1]], [v32[0], v32[1]]])
-    B = np.array([c1, c2])
-    A_inv = np.linalg.inv(A)
-    ans = A_inv.dot(B)
+        # 取圓心座標、半徑
+        center_coord = [int(ans[0]), int(ans[1])]
+        center_radius = int(((pt1[0] - center_coord[0]) ** 2 + (pt1[1] - center_coord[1])  ** 2) ** 0.5)
 
-    center_coord = [int(ans[0]), int(ans[1])]    
-            
+    elif obj['class'] == 3:
+        # 霍夫找圓
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        blur = cv2.medianBlur(gray, 5)
+        circles = cv2.HoughCircles(blur, cv2.HOUGH_GRADIENT, 1, 100, param1=50, param2=200, minRadius=100, maxRadius=600)
+        circles = np.uint16(np.around(circles))
+        circle = circles[0][0]
 
-    # elif obj['class'] == 2:
-    #     height, width, _ = img.shape
-    #     center_coord = [int(obj['coord'][0] + width * 0.5), int(obj['coord'][1] + height * 1.2)]
+        # 取圓心座標、半徑 含座標校正
+        center_coord = [int(obj['coord'][0] + circle[0]), int(obj['coord'][1] + circle[1])]
+        center_radius = circle[2]
 
-    # elif obj['class'] == 3:
-    #     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    #     blur = cv2.medianBlur(gray, 5)
-    #     circles = cv2.HoughCircles(blur, cv2.HOUGH_GRADIENT, 1, 100, param1=50, param2=200, minRadius=100, maxRadius=600)
-    #     circles = np.uint16(np.around(circles))
-    #     circle = circles[0][0]
+    # 畫圓
+    cv2.circle(center_img,(center_coord[0], center_coord[1]), center_radius, (0, 255, 0), 2)
+    cv2.circle(center_img, (center_coord[0], center_coord[1]), 2, (0, 0, 255), 2)
+    show_img('Center', center_img)
 
-    #     # 座標校正
-    #     center_coord = [int(obj['coord'][0] + circle[0]), int(obj['coord'][1] + circle[1])]
-    #     center_radius = circle[2]
-    #     # 畫圓
-    #     cv2.circle(result,(center_coord[0], center_coord[1]), center_radius, (0, 255, 0), 2)
-
-    # 畫圓心
-    cv2.circle(result, (center_coord[0], center_coord[1]), 2, (0, 0, 255), 2)
-    return center_coord
+    return center_img, center_coord
 
 
 def get_pointer_values(img, polar_img, obj_list, center_coord):
@@ -109,25 +107,26 @@ def get_pointer_values(img, polar_img, obj_list, center_coord):
             value_img = img[obj['coord'][1]:obj['coord'][3], obj['coord'][0]:obj['coord'][2]]
             value_text = digit_ocr(value_img)
 
-            # 抓出來的文字為數值才做計算
+            # 文字內容為數字才做計算
             if(value_text.isdigit()):
                 # 將數值物件左上/下、右上/下座標通通抓出來
-                polar_x1 = get_polar_coord(polar_img, center_coord, [obj['coord'][0], obj['coord'][1]])
-                polar_x2 = get_polar_coord(polar_img, center_coord, [obj['coord'][2], obj['coord'][1]])
-                polar_y1 = get_polar_coord(polar_img, center_coord, [obj['coord'][0], obj['coord'][3]])
-                polar_y2 = get_polar_coord(polar_img, center_coord, [obj['coord'][2], obj['coord'][3]])
+                polar_x1 = get_polar_coord(img, polar_img, center_coord, [obj['coord'][0], obj['coord'][1]])
+                polar_x2 = get_polar_coord(img, polar_img, center_coord, [obj['coord'][2], obj['coord'][1]])
+                polar_y1 = get_polar_coord(img, polar_img, center_coord, [obj['coord'][0], obj['coord'][3]])
+                polar_y2 = get_polar_coord(img, polar_img, center_coord, [obj['coord'][2], obj['coord'][3]])
                 value_xlist.extend([polar_x1[1], polar_x2[1], polar_y1[1], polar_y2[1]])
                 value_ylist.extend([polar_x1[0], polar_x2[0], polar_y1[0], polar_y2[0]])
 
                 # 獲取數值物件的Y軸位置
-                value_pos = get_polar_coord(polar_img, center_coord, [(obj['coord'][0] + obj['coord'][2]) / 2, (obj['coord'][1] + obj['coord'][3]) / 2])[0]
+                value_pos = get_polar_coord(img, polar_img, center_coord, [(obj['coord'][0] + obj['coord'][2]) / 2, (obj['coord'][1] + obj['coord'][3]) / 2])[0]
                 value_list.append([int(value_text), value_pos])
 
     min_x = min(value_xlist)
     max_x = max(value_xlist)
-    # width = max_x - min_x
-    min_y = min(value_ylist)
-    max_y = max(value_ylist)
+    # min_y = min(value_ylist)
+    # max_y = max(value_ylist)
+    min_y = 0
+    max_y = polar_img.shape[0]
     
     # 截出感興趣的區域
     polar_crop = polar_img[min_y:max_y, min_x:max_x]
@@ -151,20 +150,36 @@ def get_pointer_values(img, polar_img, obj_list, center_coord):
     for i in range(len(value_list)):
         value_list[i][1] -= min_y
         cv2.line(polar_crop, (0, value_list[i][1]), (polar_crop.shape[1], value_list[i][1]), (0, 255, 0), 2)
+        cv2.putText(polar_crop, '{}'.format(str(value_list[i][0])), (0, value_list[i][1]), cv2.FONT_HERSHEY_SIMPLEX, .8, (0, 255, 0), 1, cv2.LINE_AA)
 
-    return polar_crop, pointer_pos, sorted(value_list, key=itemgetter(0))
+    return polar_crop, pointer_pos, value_list
 
 
 def get_polar_img(img, center_coord):
     height, width, _ = img.shape
-    polar_img = cv2.linearPolar(img, (center_coord[0], center_coord[1]), max(width, height), cv2.INTER_LINEAR + cv2.WARP_FILL_OUTLIERS)
+
+    # 圖片逆時針90度
+    img_rotate = cv2.transpose(img)
+    img_rotate = cv2.flip(img_rotate, 0)
+
+    # 圓心座標逆時針90度
+    center_coord_rotate = [center_coord[1], width - center_coord[0]]
+
+    polar_img = cv2.linearPolar(img_rotate, (center_coord_rotate[0], center_coord_rotate[1]), max(width, height), cv2.INTER_LINEAR + cv2.WARP_FILL_OUTLIERS)
     return polar_img
 
 
-def get_polar_coord(polar_img, center_coord, coord):
-    rho = (((coord[0] - center_coord[0]) ** 2) + ((coord[1] - center_coord[1]) ** 2)) ** 0.5
-    angle = int((np.degrees(np.arctan2((coord[1] - center_coord[1]), (coord[0] - center_coord[0]))) + 360) % 360)
-    height, width, _ = polar_img.shape
+def get_polar_coord(img, polar_img, center_coord, coord):
+    height, width, _ = img.shape
+
+    # 座標逆時針90度
+    coord_rotate = [coord[1], width - coord[0]]
+
+    # 圓心座標逆時針90度
+    center_coord_rotate = [center_coord[1], width - center_coord[0]]
+
+    rho = (((coord_rotate[0] - center_coord_rotate[0]) ** 2) + ((coord_rotate[1] - center_coord_rotate[1]) ** 2)) ** 0.5
+    angle = int((np.degrees(np.arctan2((coord_rotate[1] - center_coord_rotate[1]), (coord_rotate[0] - center_coord_rotate[0]))) + 360) % 360)
     polar_coord = [int(height * (angle / 360)), int(rho)]
     return polar_coord
 
@@ -172,52 +187,38 @@ def get_polar_coord(polar_img, center_coord, coord):
 def meter_read(img, obj_list):  
     for obj in obj_list:
         if obj['class'] in [1, 2, 3, 4]: # 若物件類別為電表
-            result = img.copy()
-
             # 獲取指針、圓
-            center_coord = get_center(img, result, obj, obj_list)
+            center_img, center_coord = get_center(img, obj, obj_list)
             polar_img = get_polar_img(img, center_coord)
             polar_crop, pointer_pos, value_list = get_pointer_values(img, polar_img, obj_list, center_coord)
-            print(pointer_pos)
-            print(value_list)
 
-            value1 = None
-            value2 = None
+            value0 = [None, pointer_pos]
+            value_list.append(value0)
+            value_list = sorted(value_list, key=itemgetter(1))
+
             for i in range(len(value_list)):
-                if value_list[i][1] > pointer_pos:
-                    value1 = value_list[i]
-                    value2 = value_list[i + 1]
-                    break
-            for i in range(len(value_list)):
-                if value_list[i][1] < pointer_pos and (value1[0] - value_list[i][0]) > 0:
-                    value2 = value_list[i]
+                if value_list[i][1] == value0[1]:
+                    if i == 0:
+                        value1 = value_list[i + 1]
+                        value2 = value_list[i + 2]
+                    elif i == len(value_list) - 1:
+                        value1 = value_list[i + 1]
+                        value2 = value_list[i + 2]
+                    else:
+                        value1 = value_list[i - 1]
+                        value2 = value_list[i + 1]
 
             scale_per_pixel = (value2[0] - value1[0]) / (value2[1] - value1[1])
-            value0 = [value1[0] + (pointer_pos - value1[1]) * scale_per_pixel, pointer_pos]
+            value0 = [value2[0] + (pointer_pos - value2[1]) * scale_per_pixel, pointer_pos]
+            value0[0] = value0[0] if value0[0] > 0 else 0
             
             print(value1, value2, value0)
+            cv2.putText(polar_crop, '{}'.format(str(round(value0[0], 2))), (0, value0[1]), cv2.FONT_HERSHEY_SIMPLEX, .8, (0, 0, 255), 1, cv2.LINE_AA)
             show_img('Polar crop', polar_crop)
             # 只取一個電表
             break  
 
-            '''
-            value = int(value_text)
-            value_list.append({'value': value, 'angle': angle})
-
-            cv2.putText(result, '{}/{}'.format(value, str(angle)), (obj['coord'][0], obj['coord'][1]), cv2.FONT_HERSHEY_SIMPLEX, .5, (0, 255, 0), 1, cv2.LINE_AA)
-            '''
-        '''
-        # 獲取指針相對應的數值 取最大的兩個數值做計算
-        value_list = sorted(value_list, key=itemgetter('value'), reverse=True)
-        print(value_list)
-        angle_diff = value_list[0]['angle'] - value_list[-1]['angle']
-        value_diff = value_list[0]['value'] - value_list[-1]['value']
-        pointer_value = value_list[0]['value'] - (value_list[0]['angle'] - pointer_angle) * (value_diff / angle_diff)
-
-        cv2.putText(result, 'predicted value:{}'.format(str(pointer_value)), (50, 50), cv2.FONT_HERSHEY_SIMPLEX, .5, (0, 255, 0), 1, cv2.LINE_AA)
-        '''
-    # show_img('img', result)
-    return polar_crop
+    return center_img, polar_crop
 
 
 def main(_argv):
@@ -285,14 +286,16 @@ def main(_argv):
         x2 = int(box[3] * original_image.shape[1])
         obj_class = int(classes.numpy()[0][i])
         obj_list.append({'class': obj_class, 'coord': [x1, y1, x2, y2]})
-    polar_crop = meter_read(original_image, obj_list)
+    center_img, polar_crop = meter_read(original_image, obj_list)
 
     image = utils.draw_bbox(original_image, pred_bbox)
     # image = utils.draw_bbox(image_data*255, pred_bbox)
     image = Image.fromarray(image.astype(np.uint8))
-    image.show()
+    # image.show()
     image = cv2.cvtColor(np.array(image), cv2.COLOR_BGR2RGB)
     cv2.imwrite(FLAGS.output, image)
+    cv2.imwrite(FLAGS.output[:-4] + '_polar.png', polar_crop)
+    cv2.imwrite(FLAGS.output[:-4] + '_center.png', center_img)
 
 if __name__ == '__main__':
     try:
