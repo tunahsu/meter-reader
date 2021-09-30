@@ -56,9 +56,9 @@ def get_center(img, obj, obj_list):
     if obj['class'] in [1, 2]:
         # 任取圓上三點計算圓心
         value_list = [value for value in obj_list if value['class'] == 0]
-        pt1 = [(value_list[0]['coord'][0] + value_list[0]['coord'][0]) / 2, (value_list[0]['coord'][1] + value_list[0]['coord'][3]) / 2]
-        pt2 = [(value_list[1]['coord'][0] + value_list[1]['coord'][0]) / 2, (value_list[1]['coord'][1] + value_list[1]['coord'][3]) / 2]
-        pt3 = [(value_list[2]['coord'][0] + value_list[2]['coord'][0]) / 2, (value_list[2]['coord'][1] + value_list[2]['coord'][3]) / 2]
+        pt1 = [(value_list[0]['coord'][0] + value_list[0]['coord'][2]) / 2, (value_list[0]['coord'][1] + value_list[0]['coord'][3]) / 2]
+        pt2 = [(value_list[1]['coord'][0] + value_list[1]['coord'][2]) / 2, (value_list[1]['coord'][1] + value_list[1]['coord'][3]) / 2]
+        pt3 = [(value_list[2]['coord'][0] + value_list[2]['coord'][2]) / 2, (value_list[2]['coord'][1] + value_list[2]['coord'][3]) / 2]
 
         v21 = [pt2[0] - pt1[0], pt2[1] - pt1[1]]
         pt21 = [(pt2[0] + pt1[0]) / 2, (pt2[1] + pt1[1]) / 2]
@@ -97,10 +97,11 @@ def get_center(img, obj, obj_list):
     return center_img, center_coord
 
 
-def get_pointer_values(img, polar_img, obj_list, center_coord):
+def get_pointer_values(meter, img, polar_img, obj_list, center_coord):
     value_list = []
     value_xlist = []
     value_ylist = []
+
     for obj in obj_list:
         if obj['class'] == 0: # 若物件類別為數值才做計算
             # 文字辨識
@@ -110,24 +111,31 @@ def get_pointer_values(img, polar_img, obj_list, center_coord):
             # 文字內容為數字才做計算
             if(value_text.isdigit()):
                 # 將數值物件左上/下、右上/下座標通通抓出來
-                polar_x1 = get_polar_coord(img, polar_img, center_coord, [obj['coord'][0], obj['coord'][1]])
-                polar_x2 = get_polar_coord(img, polar_img, center_coord, [obj['coord'][2], obj['coord'][1]])
-                polar_y1 = get_polar_coord(img, polar_img, center_coord, [obj['coord'][0], obj['coord'][3]])
-                polar_y2 = get_polar_coord(img, polar_img, center_coord, [obj['coord'][2], obj['coord'][3]])
-                value_xlist.extend([polar_x1[1], polar_x2[1], polar_y1[1], polar_y2[1]])
-                value_ylist.extend([polar_x1[0], polar_x2[0], polar_y1[0], polar_y2[0]])
+                value_top_left = get_polar_coord(img, center_coord, [obj['coord'][0], obj['coord'][1]])
+                value_top_right = get_polar_coord(img, center_coord, [obj['coord'][2], obj['coord'][1]])
+                value_bottom_left = get_polar_coord(img, center_coord, [obj['coord'][0], obj['coord'][3]])
+                value_bottom_right = get_polar_coord(img, center_coord, [obj['coord'][2], obj['coord'][3]])
+                value_xlist.extend([value_top_left[1], value_top_right[1], value_bottom_left[1], value_bottom_right[1]])
 
                 # 獲取數值物件的Y軸位置
-                value_pos = get_polar_coord(img, polar_img, center_coord, [(obj['coord'][0] + obj['coord'][2]) / 2, (obj['coord'][1] + obj['coord'][3]) / 2])[0]
+                value_pos = get_polar_coord(img, center_coord, [(obj['coord'][0] + obj['coord'][2]) / 2, (obj['coord'][1] + obj['coord'][3]) / 2])[0]
                 value_list.append([int(value_text), value_pos])
 
     min_x = min(value_xlist)
     max_x = max(value_xlist)
-    # min_y = min(value_ylist)
-    # max_y = max(value_ylist)
-    min_y = 0
-    max_y = polar_img.shape[0]
-    
+
+    if meter['class'] in [1, 2]:
+        meter_top_left = get_polar_coord(img, center_coord, [meter['coord'][0], meter['coord'][1]])
+        meter_top_right = get_polar_coord(img, center_coord, [meter['coord'][2], meter['coord'][1]])
+        meter_bottom_left = get_polar_coord(img, center_coord, [meter['coord'][0], meter['coord'][3]])
+        meter_bottom_right = get_polar_coord(img, center_coord, [meter['coord'][2], meter['coord'][3]])
+        value_ylist.extend([meter_top_left[0], meter_top_right[0], meter_bottom_left[0], meter_bottom_right[0]])
+        min_y = min(value_ylist)
+        max_y = max(value_ylist)
+    elif meter['class'] == 3:
+        min_y = 0
+        max_y = polar_img.shape[0]
+
     # 截出感興趣的區域
     polar_crop = polar_img[min_y:max_y, min_x:max_x]
     polar_gray = cv2.cvtColor(polar_crop, cv2.COLOR_BGR2GRAY)
@@ -146,8 +154,8 @@ def get_pointer_values(img, polar_img, obj_list, center_coord):
 
     cv2.line(polar_crop, (0, pointer_pos), (polar_crop.shape[1], pointer_pos), (0, 0, 255), 2)
 
-    # 根據感興趣的區塊對數值物件的Y軸位置做校正
     for i in range(len(value_list)):
+        # 根據感興趣的區塊對數值物件的Y軸位置做校正
         value_list[i][1] -= min_y
         cv2.line(polar_crop, (0, value_list[i][1]), (polar_crop.shape[1], value_list[i][1]), (0, 255, 0), 2)
         cv2.putText(polar_crop, '{}'.format(str(value_list[i][0])), (0, value_list[i][1]), cv2.FONT_HERSHEY_SIMPLEX, .8, (0, 255, 0), 1, cv2.LINE_AA)
@@ -165,11 +173,11 @@ def get_polar_img(img, center_coord):
     # 圓心座標逆時針90度
     center_coord_rotate = [center_coord[1], width - center_coord[0]]
 
-    polar_img = cv2.linearPolar(img_rotate, (center_coord_rotate[0], center_coord_rotate[1]), max(width, height), cv2.INTER_LINEAR + cv2.WARP_FILL_OUTLIERS)
+    polar_img = cv2.linearPolar(img_rotate, (center_coord_rotate[0], center_coord_rotate[1]), max(width, height), cv2.INTER_LINEAR)
     return polar_img
 
 
-def get_polar_coord(img, polar_img, center_coord, coord):
+def get_polar_coord(img, center_coord, coord):
     height, width, _ = img.shape
 
     # 座標逆時針90度
@@ -186,11 +194,12 @@ def get_polar_coord(img, polar_img, center_coord, coord):
 
 def meter_read(img, obj_list):  
     for obj in obj_list:
-        if obj['class'] in [1, 2, 3, 4]: # 若物件類別為電表
-            # 獲取指針、圓
+        if obj['class'] in [1, 2, 3, 4]:
+            # 獲取指針、圓若物件類別為電表
+            meter = obj
             center_img, center_coord = get_center(img, obj, obj_list)
             polar_img = get_polar_img(img, center_coord)
-            polar_crop, pointer_pos, value_list = get_pointer_values(img, polar_img, obj_list, center_coord)
+            polar_crop, pointer_pos, value_list = get_pointer_values(meter, img, polar_img, obj_list, center_coord)
 
             value0 = [None, pointer_pos]
             value_list.append(value0)
