@@ -15,6 +15,7 @@ from tensorflow.compat.v1 import InteractiveSession
 
 # my imports
 from operator import itemgetter
+import matplotlib.pyplot as plt
 import pytesseract
 pytesseract.pytesseract.tesseract_cmd = 'C:\\Program Files\\Tesseract-OCR\\tesseract.exe'
 
@@ -137,7 +138,7 @@ def get_pointer_values(meter, img, polar_img, obj_list, center_coord):
         max_y = polar_img.shape[0]
 
     # 截出感興趣的區域
-    polar_crop = polar_img[min_y:max_y, min_x:max_x]
+    polar_crop = polar_img[min_y:max_y, min_x:max_x + (max_x - min_x)]
     polar_gray = cv2.cvtColor(polar_crop, cv2.COLOR_BGR2GRAY)
     ret, polar_thresh = cv2.threshold(polar_gray, 150, 255, cv2.THRESH_BINARY)
     
@@ -239,8 +240,6 @@ def main(_argv):
     image_path = FLAGS.image
 
     original_image = cv2.imread(image_path)
-    original_image = cv2.cvtColor(original_image, cv2.COLOR_BGR2RGB)
-
     # image_data = utils.image_preprocess(np.copy(original_image), [input_size, input_size])
     image_data = cv2.resize(original_image, (input_size, input_size))
     image_data = image_data / 255.
@@ -300,11 +299,15 @@ def main(_argv):
     image = utils.draw_bbox(original_image, pred_bbox)
     # image = utils.draw_bbox(image_data*255, pred_bbox)
     image = Image.fromarray(image.astype(np.uint8))
-    # image.show()
-    image = cv2.cvtColor(np.array(image), cv2.COLOR_BGR2RGB)
-    cv2.imwrite(FLAGS.output, image)
-    cv2.imwrite(FLAGS.output[:-4] + '_polar.png', polar_crop)
-    cv2.imwrite(FLAGS.output[:-4] + '_center.png', center_img)
+
+    plt.subplot(1, 3, 1)
+    plt.imshow(image)
+    plt.subplot(1, 3, 2)
+    plt.imshow(center_img)
+    plt.subplot(1, 3, 3)
+    plt.imshow(polar_crop)
+    plt.savefig('result.png', dpi=300)
+    plt.show()
 
 if __name__ == '__main__':
     try:
