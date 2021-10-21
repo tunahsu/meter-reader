@@ -54,7 +54,7 @@ def get_center(img, obj, obj_list):
     center_img = img.copy()
     img = img[obj['coord'][1]:obj['coord'][3], obj['coord'][0]:obj['coord'][2]]
 
-    if obj['class'] in [1, 2]:
+    if obj['class'] == 7:
         # 任取圓上三點計算圓心
         value_list = [value for value in obj_list if value['class'] == 0]
         pt1 = [(value_list[0]['coord'][0] + value_list[0]['coord'][2]) / 2, (value_list[0]['coord'][1] + value_list[0]['coord'][3]) / 2]
@@ -78,7 +78,7 @@ def get_center(img, obj, obj_list):
         center_coord = [int(ans[0]), int(ans[1])]
         center_radius = int(((pt1[0] - center_coord[0]) ** 2 + (pt1[1] - center_coord[1])  ** 2) ** 0.5)
 
-    elif obj['class'] == 3:
+    elif obj['class'] == 8:
         # 霍夫找圓
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         blur = cv2.medianBlur(gray, 5)
@@ -147,12 +147,12 @@ def get_pointer_values(meter, img, polar_img, obj_list, center_coord):
     min_x = min(value_xlist)
     max_x = max(value_xlist)
 
-    if meter['class'] in [1, 2]:
+    if meter['class'] == 7:
         # 方形電表避免截到黑色區域 進一步限制polar_image的長
         min_y = get_polar_coord(img, center_coord, [center_coord[0] - 5, center_coord[1] + 1])[0]
         max_y = get_polar_coord(img, center_coord, [center_coord[0] + 1, center_coord[1] - 5])[0]
 
-    elif meter['class'] == 3:
+    elif meter['class'] == 8:
         # 圓形電表抓原本的長就好
         min_y = 0
         max_y = polar_img.shape[0]
@@ -161,6 +161,7 @@ def get_pointer_values(meter, img, polar_img, obj_list, center_coord):
     polar_crop = polar_img[min_y:max_y, min_x:max_x + (max_x - min_x)]
     polar_gray = cv2.cvtColor(polar_crop, cv2.COLOR_BGR2GRAY)
     ret, polar_thresh = cv2.threshold(polar_gray, 150, 255, cv2.THRESH_BINARY)
+    # show_img('Polar thresh', polar_thresh)
     
     # 透過累加器取出黑色pixel最多的列
     max_acc = 0
@@ -216,7 +217,7 @@ def get_polar_coord(img, center_coord, coord):
 
 def meter_read(img, obj_list):  
     for obj in obj_list:
-        if obj['class'] in [1, 2, 3, 4]:
+        if obj['class'] in [7, 8]:
             # 獲取指針、圓若物件類別為電表
             meter = obj
             center_img, center_coord = get_center(img, obj, obj_list)
@@ -323,6 +324,7 @@ def main(_argv):
         x2 = int(box[3] * original_image.shape[1])
         obj_class = int(classes.numpy()[0][i])
         obj_list.append({'class': obj_class, 'coord': [x1, y1, x2, y2]})
+        
     center_img, polar_crop = meter_read(original_image, obj_list)
 
     image = utils.draw_bbox(original_image, pred_bbox)
