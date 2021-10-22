@@ -37,15 +37,6 @@ python detect.py --weights checkpoints\yolov4-analog-ammeter-160 --image test.jp
 
 ## 模型訓練
 先運行 sctipts/voc/ 中的腳本產生 YOLO 的資料集格式，請確保腳本中路徑是正確的，遷移學習的預訓練模型可至此下載 [yolov4.weights](https://drive.google.com/open?id=1cewMfusmPjYWbrnuJRuKhPMwRe_b9PaT)
-```
-meter-reader                                                                     
-├─data                                                                           
-│  ├─classes                                                                  
-│  │      analog_ammeter.names
-│  └─dataset                                                                  
-│          analog_ammeter_train.txt                                           
-│          analog_ammeter_val.txt         
-```
 
 ```bash
 cd scripts/voc/
@@ -60,6 +51,18 @@ python train.py
 
 # 遷移學習
 python train.py --weights ./data/yolov4.weights
+```
+
+訓練前確認是否有以下檔案
+
+```
+meter-reader                                                                     
+├─data                                                                           
+│  ├─classes                                                                  
+│  │      analog_ammeter.names
+│  └─dataset                                                                  
+│          analog_ammeter_train.txt                                           
+│          analog_ammeter_val.txt         
 ```
 
 ## 遭遇問題及困難
