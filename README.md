@@ -53,16 +53,20 @@ python train.py
 python train.py --weights ./data/yolov4.weights
 ```
 
-訓練前確認是否有以下檔案
+訓練前確認是否有以下資料夾及檔案
 
 ```
-meter-reader                                                                     
-├─data                                                                           
-│  ├─classes                                                                  
+meter-reader/                                                                     
+├─data/                        
+│  ├─analog_ammeter_dataset_20211022/
+│  │  ├─Annotations/
+│  │  ├─ImageSets/
+│  │  └─JPEGImages/
+│  ├─classes/                                                                  
 │  │      analog_ammeter.names
-│  └─dataset                                                                  
-│          analog_ammeter_train.txt                                           
-│          analog_ammeter_val.txt         
+│  └─dataset/                                                                  
+│         analog_ammeter_train.txt                                           
+│         analog_ammeter_val.txt         
 ```
 
 ## 遭遇問題及困難
