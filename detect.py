@@ -196,6 +196,7 @@ def get_polar_img(img, center_coord):
     center_coord_rotate = [center_coord[1], width - center_coord[0]]
 
     polar_img = cv2.linearPolar(img_rotate, (center_coord_rotate[0], center_coord_rotate[1]), max(width, height), cv2.INTER_LINEAR)
+    # show_img('Polar image', polar_img)
     return polar_img
 
 
