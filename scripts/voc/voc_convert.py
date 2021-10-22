@@ -6,13 +6,13 @@ from absl.flags import FLAGS
 from lxml import etree
 
 
-flags.DEFINE_string('image_dir', '../../data/VOCtrainval_11-May-2012/VOCdevkit/VOC2012/JPEGImages', 'path to image dir')
-flags.DEFINE_string('anno_dir', '../../data/VOCtrainval_11-May-2012/VOCdevkit/VOC2012/Annotations', 'path to anno dir')
-flags.DEFINE_string('train_list_txt', '../../data/VOCtrainval_11-May-2012/VOCdevkit/VOC2012/ImageSets/Main/train.txt', 'path to a set of train')
-flags.DEFINE_string('val_list_txt', '../../data/VOCtrainval_11-May-2012/VOCdevkit/VOC2012/ImageSets/Main/val.txt', 'path to a set of val')
-flags.DEFINE_string('classes', '../../data/classes/voc2012.names', 'path to a list of class names')
-flags.DEFINE_string('train_output', '../../data/dataset/voc2012_train.txt', 'path to a file for train')
-flags.DEFINE_string('val_output', '../../data/dataset/voc2012_val.txt', 'path to a file for val')
+flags.DEFINE_string('image_dir', '../../data/analog_ammeter_dataset_20211022/JPEGImages', 'path to image dir')
+flags.DEFINE_string('anno_dir', '../../data/analog_ammeter_dataset_20211022/Annotations', 'path to anno dir')
+flags.DEFINE_string('train_list_txt', '../../data/analog_ammeter_dataset_20211022/ImageSets/Main/train.txt', 'path to a set of train')
+flags.DEFINE_string('val_list_txt', '../../data/analog_ammeter_dataset_20211022/ImageSets/Main/test.txt', 'path to a set of val')
+flags.DEFINE_string('classes', '../../data/classes/analog_ammeter.names', 'path to a list of class names')
+flags.DEFINE_string('train_output', '../../data/dataset/analog_ammeter_train.txt', 'path to a file for train')
+flags.DEFINE_string('val_output', '../../data/dataset/analog_ammeter_val.txt', 'path to a file for val')
 
 flags.DEFINE_boolean('no_val', False, 'if uses this flag, it does not convert a list of val')
 
