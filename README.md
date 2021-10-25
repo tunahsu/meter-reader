@@ -71,45 +71,45 @@ meter-reader/
 ## 方法
 * ### 流程圖
 <p float="left">
-  <img src="./method/flowchart.png" width="250" />
+  <img src="./doc/images/method/flowchart.png" width="250" />
 </p>
 
 * ### YOLOv4 物件偵測
 詳細程式碼建議至 TensorFlow 版 YOLOv4 的原專案查看 [tensorflow-yolov4-tflite](https://github.com/hunglc007/tensorflow-yolov4-tflite)
 <p float="left">
-  <img src="./method/detect.png" width="200" />
+  <img src="./doc/images/method/detect.png" width="200" />
 </p>
 
 * ### 圓心計算
 針對方形電表我們使用任三點取圓的方式來獲取圓心，任意三個數值物件的坐標帶入計算即可，而圓型電表則直接使用霍夫變換來偵測圓的外圍
 <p float="left">
-  <img src="./method/center.png" width="200" />
+  <img src="./doc/images/method/center.png" width="200" />
 </p>
 
 * ### 極坐標轉換
 使用此方法的好處是可以將有刻度及指針的區域拉成直的，必須要先取得電表中指針的圓心，若圓心坐標誤差太大則會導致我們希望截取的區域過於扭曲
 <p float="left">
-  <img src="./method/polar_img.png" width="200" />
+  <img src="./doc/images/method/polar_img.png" width="200" />
 </p>
 
 * ### 截取 ROI
 透過物件偵測中數值物件的坐標，我們可以使用其及坐標轉換後對應的位置，截取出我們感興趣的區域(ROI)，並針對每個 ROI 計算哪一個 Row 的黑色 pixel 最多，則其為指針/刻度的位置
 <p float="left">
-  <img src="./method/first_roi.png" width="100" />
+  <img src="./doc/images/method/first_roi.png" width="100" />
   &emsp;
-  <img src="./method/second_roi1.png" width="100" />
+  <img src="./doc/images/method/second_roi1.png" width="100" />
   &emsp;
-  <img src="./method/second_roi2.png" width="100" />
+  <img src="./doc/images/method/second_roi2.png" width="100" />
   &emsp;
-  <img src="./method/second_roi3.png" width="100" />
+  <img src="./doc/images/method/second_roi3.png" width="100" />
   &emsp;
-  <img src="./method/second_roi4.png" width="100" />
+  <img src="./doc/images/method/second_roi4.png" width="100" />
 </p>
 
 * ### 指針數值計算
 在所有刻度中，我們以離指針最近的兩個去計算，根據其相對距離與跟指針的相對距離關係，就可以得出指針相對應的數值
 <p float="left">
-  <img src="./method/result.png" width="200" />
+  <img src="./doc/images/method/result.png" width="200" />
 </p>
 
 ## 遭遇問題及困難
