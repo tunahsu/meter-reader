@@ -129,7 +129,7 @@ python train.py
 python train.py --weights ./data/yolov4.weights
 ```
 
-訓練完後執行會在專案根目錄產生 checkpoints/ 資料夾，必須將其轉為 TensorFlow 的格式，在此之前先參照此 issue 更改 save_model.py
+訓練完後執行會在專案根目錄產生 checkpoints/ 資料夾，必須將其轉為 TensorFlow 的格式，在此之前先參照此 [issue](https://github.com/hunglc007/tensorflow-yolov4-tflite/issues/160) 更改 save_model.py
 
 ```
 # utils.load_weights(model, FLAGS.weights, FLAGS.model, FLAGS.tiny)
