@@ -44,12 +44,15 @@ class3
 ```
 打開 LabelImg 開啟欲標記的資料集的資料夾，包括圖檔資料夾及標記檔資料夾，並將標記格式設為 PascalVOC
 
-<img src="./images/label/label_1.png" width="400" />
+<p float="left">
+  <img src="./images/label/label_1.png" width="400" />
+</p>
 
 框選欲標記的物件，選好類別後點儲存按鈕，標記檔就會輸出至 Annotations/，檔名會與 JPEGImages/ 中的圖片相對應
 
-<img src="./images/label/label_2.png" width="400" />
-
+<p float="left">
+  <img src="./images/label/label_2.png" width="400" />
+</p>
 
 LabelImg 快捷鍵可以參考[原專案](https://github.com/tzutalin/labelImg)
 
@@ -145,7 +148,7 @@ python save_model.py --weights ./checkpoints/yolov4 --output ./checkpoints/yolov
 ##  模型轉換
 
 想要在 Android 裝置上進行偵測，我們必須將模型轉為 TensorFlow Lite 的格式，在 save model 以及 detect 時命列參數 --framework 要設為 tflite
-    
+
 ```bash
 python save_model.py --weights ./checkpoints/yolov4 --output ./checkpoints/yolov4-416 --input_size 416 --model yolov4 --framework tflite
 
