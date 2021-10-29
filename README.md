@@ -48,6 +48,22 @@ python detect.py --weights checkpoints\yolov4-analog-ammeter-160 --image test.jp
 ```
 
 
+## 準確度
+
+| YOLOv4 160 images    | Rectangle meter | Circular meter | Value |
+|----------------------|-----------------|----------------|-------|
+| Train                | 85              | 81             | 1353  |
+| Test                 | 17              | 17             | 312   |
+
+<p float="left">
+  <img src="./doc/images/mAP/Analog_Circular_Ammeter.png" width="150" />
+  &emsp;
+  <img src="./doc/images/mAP/Analog_Rectangle_Ammeter.png" width="150" />
+  &emsp;
+  <img src="./doc/images/mAP/Value.png" width="150" />
+</p>
+
+
 ## 模型訓練
 
 先運行 sctipts/voc/ 中的腳本產生 YOLO 的資料集格式，請確保腳本中路徑是正確的，遷移學習的預訓練模型可至此下載 [yolov4.weights](https://drive.google.com/open?id=1cewMfusmPjYWbrnuJRuKhPMwRe_b9PaT)
