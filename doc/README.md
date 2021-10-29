@@ -4,7 +4,7 @@
 ## 安裝
 
 * 下載並安裝 [Python](https://www.python.org/)
-* 至[原專案](https://github.com/tzutalin/labelImg)複製專案資料夾
+* 至[原專案](https://github.com/tzutalin/labelImg)複製專案資料夾，或直接使用本專案的備份
 * 依以下指令安裝相關依賴
 
 ```
@@ -19,7 +19,7 @@ python labelImg.py
 
 ## 製作資料集
 
-創建 dataset 資料夾及、子資料夾及所需檔案，其中 JPEGImages/ 存放欲標記的圖檔 Annotations/ 存放標記檔案，其餘的會在產生 YOLO 格式訓練檔案時會用到
+1. 創建 dataset 資料夾及、子資料夾及所需檔案，其中 JPEGImages/ 存放欲標記的圖檔 Annotations/ 存放標記檔案，其餘的會在產生 YOLO 格式訓練檔案時會用到
 
 ```bash
 dataset/
@@ -33,7 +33,7 @@ dataset/
 └─JPEGImages/
 ```
 
-修改 labelImg/data/predefined_classes.txt 中的內容為欲標記的類別
+2. 修改 labelImg/data/predefined_classes.txt 中的內容為欲標記的類別
 ```
 class1
 class2
@@ -42,19 +42,19 @@ class3
 .
 .
 ```
-打開 LabelImg 開啟欲標記的資料集的資料夾，包括圖檔資料夾及標記檔資料夾，並將標記格式設為 PascalVOC
+3. 打開 LabelImg 開啟欲標記的資料集的資料夾，包括圖檔資料夾及標記檔資料夾，並將標記格式設為 PascalVOC
 
 <p float="left">
   <img src="./images/label/label_1.png" width="400" />
 </p>
 
-框選欲標記的物件，選好類別後點儲存按鈕，標記檔就會輸出至 Annotations/，檔名會與 JPEGImages/ 中的圖片相對應
+4. 框選欲標記的物件，選好類別後點儲存按鈕，標記檔就會輸出至 Annotations/，檔名會與 JPEGImages/ 中的圖片相對應
 
 <p float="left">
   <img src="./images/label/label_2.png" width="400" />
 </p>
 
-LabelImg 快捷鍵可以參考[原專案](https://github.com/tzutalin/labelImg)
+5. LabelImg 快捷鍵可以參考[原專案](https://github.com/tzutalin/labelImg#hotkeys)
 
 
 # TensorFlow YOLOv4
@@ -97,7 +97,7 @@ python detect.py --weights ./checkpoints/yolov4-tiny-416 --size 416 --model yolo
 
 ## 模型訓練
 
-參考本專案的[模型訓練](https://github.com/tunahsu/meter-reader/#%E6%A8%A1%E5%9E%8B%E8%A8%93%E7%B7%B4)，將資料夾放入 data/ 中，執行本專案撰寫好的腳本，可至 meter-reader/scripts/voc/ 中取得，執行完畢後會得到以下資料夾及檔案
+1. 參考本專案的[模型訓練](https://github.com/tunahsu/meter-reader/#%E6%A8%A1%E5%9E%8B%E8%A8%93%E7%B7%B4)，將資料夾放入 data/ 中，執行本專案撰寫好的腳本，可至 meter-reader/scripts/voc/ 中取得，執行完畢後會得到以下資料夾及檔案
 
 ```bash
 meter-reader/                                                                     
@@ -109,16 +109,29 @@ meter-reader/
 │         dataset_val.txt  
 ```
 
-配置訓練參數 core/config.py
+2. 配置訓練參數 core/config.py
 
 ```
-# 確認路徑是否正確
+# 路徑
 __C.YOLO.CLASSES              = "./data/classes/dataset.names"
 __C.TRAIN.ANNOT_PATH          = "./data/dataset/dataset_train.txt"
 __C.TEST.ANNOT_PATH           = "./data/dataset/dataset_val.txt"
+
+.
+.
+.
+# 其餘超參數依需求自行更改
+__C.TRAIN.LR_INIT             = 1e-3
+__C.TRAIN.LR_END              = 1e-6
+__C.TRAIN.WARMUP_EPOCHS       = 2
+__C.TRAIN.FISRT_STAGE_EPOCHS    = 20
+__C.TRAIN.SECOND_STAGE_EPOCHS   = 30
+.
+.
+.
 ```
 
-執行 train.py 開始訓練
+3. 執行 train.py 開始訓練
 
 ```bash
 # 從頭開始訓練
@@ -129,7 +142,7 @@ python train.py
 python train.py --weights ./data/yolov4.weights
 ```
 
-訓練完後執行會在專案根目錄產生 checkpoints/ 資料夾，必須將其轉為 TensorFlow 的格式，在此之前先參照此 [issue](https://github.com/hunglc007/tensorflow-yolov4-tflite/issues/160) 更改 save_model.py
+4. 訓練完後執行會在專案根目錄產生 checkpoints/ 資料夾，必須將其轉為 TensorFlow 的格式，在此之前先參照此 [issue](https://github.com/hunglc007/tensorflow-yolov4-tflite/issues/160) 更改 save_model.py
 
 ```
 # utils.load_weights(model, FLAGS.weights, FLAGS.model, FLAGS.tiny)
@@ -138,7 +151,7 @@ python train.py --weights ./data/yolov4.weights
 model.load_weights(FLAGS.weights)
 ```
 
-接著執行 執行 save_model.py 及可得到 custom model 完成訓練的所有步驟
+5. 接著執行 執行 save_model.py 及可得到 custom model 完成訓練的所有步驟
 
 ```bash
 python save_model.py --weights ./checkpoints/yolov4 --output ./checkpoints/yolov4-your-model
