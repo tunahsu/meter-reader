@@ -1,9 +1,9 @@
 # 類比電表辨識
 
 <p float="left">
-  <img src="./results/result4.png" width="300" />
+  <img src="./results/result4.png" width="400" />
   &emsp;
-  <img src="./results/result6.png" width="300" />
+  <img src="./results/result6.png" width="400" />
 </p>
 
 
@@ -116,7 +116,7 @@ meter-reader/
 ### 流程圖
 
 <p float="left">
-  <img src="./doc/images/method/flowchart.png" width="300" />
+  <img src="./doc/images/method/flowchart.png" width="400" />
 </p>
 
 ### YOLOv4 物件偵測
