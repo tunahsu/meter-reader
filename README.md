@@ -48,20 +48,31 @@ python detect.py --weights checkpoints\yolov4-analog-ammeter-160 --image test.jp
 ```
 
 
-## 準確度
+## 評估
 
-| YOLOv4 160 images    | Rectangle meter | Circular meter | Value |
-|----------------------|-----------------|----------------|-------|
-| Train                | 85              | 81             | 1353  |
-| Test                 | 17              | 17             | 312   |
+### 準確度
 
-<p float="left">
-  <img src="./doc/images/mAP/Analog_Circular_Ammeter.png" width="150" />
-  &emsp;
-  <img src="./doc/images/mAP/Analog_Rectangle_Ammeter.png" width="150" />
-  &emsp;
-  <img src="./doc/images/mAP/Value.png" width="150" />
-</p>
+詳細數據可至 doc/imags/mAP 中查看
+
+| Data volume | Rectangle meter | Circular meter | Value |
+|-------------|-----------------|----------------|-------|
+| Train       | 85              | 81             | 1353  |
+| Test        | 17              | 17             | 312   |
+
+| Detection   | mAP   |
+|-------------|-------|
+| YOLOv4      | 89.05 |
+| YOLOv4 Tiny | 82.10 |
+
+
+### 模型大小
+
+在轉至 .tflite 後模型大小與轉換前幾乎相同，主要是 Tiny 的模型大小、運算量會小很多
+
+| Model       | Size      |
+|-------------|-----------|
+| YOLOv4      | 255.96 MB |
+| YOLOv4 Tiny | 22.5 MB   |
 
 
 ## 模型訓練
@@ -105,7 +116,7 @@ meter-reader/
 ### 流程圖
 
 <p float="left">
-  <img src="./doc/images/method/flowchart.png" width="250" />
+  <img src="./doc/images/method/flowchart.png" width="300" />
 </p>
 
 ### YOLOv4 物件偵測
@@ -113,7 +124,7 @@ meter-reader/
 詳細程式碼建議至 TensorFlow 版 YOLOv4 的原專案查看 [tensorflow-yolov4-tflite](https://github.com/hunglc007/tensorflow-yolov4-tflite)
 
 <p float="left">
-  <img src="./doc/images/method/detect.png" width="200" />
+  <img src="./doc/images/method/detect.png" width="300" />
 </p>
 
 ### 圓心計算
@@ -121,7 +132,7 @@ meter-reader/
 針對方形電表我們使用任三點取圓的方式來獲取圓心，任意三個數值物件的坐標帶入計算即可，而圓型電表則直接使用霍夫變換來偵測圓的外圍
 
 <p float="left">
-  <img src="./doc/images/method/center.png" width="200" />
+  <img src="./doc/images/method/center.png" width="300" />
 </p>
 
 ### 極坐標轉換
@@ -129,7 +140,7 @@ meter-reader/
 使用此方法的好處是可以將有刻度及指針的區域拉成直的，必須要先取得電表中指針的圓心，若圓心坐標誤差太大則會導致我們希望截取的區域過於扭曲
 
 <p float="left">
-  <img src="./doc/images/method/polar_img.png" width="200" />
+  <img src="./doc/images/method/polar_img.png" width="300" />
 </p>
 
 ### 截取 ROI
@@ -151,12 +162,12 @@ meter-reader/
 ### 指針數值計算
 
 <p float="left">
-  <img src="./doc/images/method/result.png" width="200" />
+  <img src="./doc/images/method/result.png" width="300" />
 </p>
 
 ## 遭遇問題及困難
 
-* 目前使用的 OCR library(pytesseract) 效果不甚理想，數字辨識錯誤會嚴重影響最終的結果
+* 目前使用的 OCR library(pytesseract) 效果不甚理想，數字辨識錯誤會影響最終的結果
 * 對電表中 pattern 處理的演算法彈性不大，仍須對不同型態的電表類別去設計
 * 幾乎沒有真實場景中的電表資料，很難估計在光影等因素的影響下成效如何
 * 些許情況下無法辨識，如有兩圈刻度的圓形電表，或是其他非常規顯示的電表

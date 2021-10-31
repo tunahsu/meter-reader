@@ -45,13 +45,13 @@ class3
 3. 打開 LabelImg 開啟欲標記的資料集的資料夾，包括圖檔資料夾及標記檔資料夾，並將標記格式設為 PascalVOC
 
 <p float="left">
-  <img src="./images/label/label_1.png" width="400" />
+  <img src="./images/label/label_1.png" width="500" />
 </p>
 
 4. 框選欲標記的物件，選好類別後點儲存按鈕，標記檔就會輸出至 Annotations/，檔名會與 JPEGImages/ 中的圖片相對應
 
 <p float="left">
-  <img src="./images/label/label_2.png" width="400" />
+  <img src="./images/label/label_2.png" width="500" />
 </p>
 
 5. LabelImg 快捷鍵可以參考[原專案](https://github.com/tzutalin/labelImg#hotkeys)
@@ -131,7 +131,7 @@ __C.TRAIN.SECOND_STAGE_EPOCHS   = 30
 .
 ```
 
-3. 執行 train.py 開始訓練
+3. 執行 train.py 開始訓練，注意若需要訓練 Tiny 版的話，請參考此 [issue](https://github.com/hunglc007/tensorflow-yolov4-tflite/issues/238) 修改 core/dataset.py
 
 ```bash
 # 從頭開始訓練
