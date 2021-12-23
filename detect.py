@@ -98,95 +98,9 @@ def get_center(img, obj, obj_list):
     return center_img, center_coord
 
 
-def get_pointer_values(meter, img, polar_img, obj_list, center_coord):
-    value_list = []
-    value_xlist = []
-    value_ylist = []
-
-    for obj in obj_list:
-        if obj['class'] == 0: # 若物件類別為數值才做計算
-            # 文字辨識
-            value_img = img[obj['coord'][1]:obj['coord'][3], obj['coord'][0]:obj['coord'][2]]
-            value_text = digit_ocr(value_img)
-
-            # 文字內容為數字才做計算
-            if(value_text.isdigit()):
-                # 將數值物件左上/下、右上/下座標通通抓出來
-                value_top_left = get_polar_coord(img, center_coord, [obj['coord'][0], obj['coord'][1]])
-                value_top_right = get_polar_coord(img, center_coord, [obj['coord'][2], obj['coord'][1]])
-                value_bottom_left = get_polar_coord(img, center_coord, [obj['coord'][0], obj['coord'][3]])
-                value_bottom_right = get_polar_coord(img, center_coord, [obj['coord'][2], obj['coord'][3]])
-                value_xlist.extend([value_top_left[1], value_top_right[1], value_bottom_left[1], value_bottom_right[1]])
-
-                # 獲取數值物件在polar_image中的"最"左/上/右/下位置
-                sec_roi_min_x = min(value_top_left[1], value_top_right[1], value_bottom_left[1], value_bottom_right[1])
-                sec_roi_max_x = max(value_top_left[1], value_top_right[1], value_bottom_left[1], value_bottom_right[1])
-                sec_roi_min_y = min(value_top_left[0], value_top_right[0], value_bottom_left[0], value_bottom_right[0])
-                sec_roi_max_y = max(value_top_left[0], value_top_right[0], value_bottom_left[0], value_bottom_right[0])
-                
-                # 截出感興趣的區域
-                sec_roi = polar_img[sec_roi_min_y:sec_roi_max_y, sec_roi_min_x:(2 * sec_roi_max_x - sec_roi_min_x)]
-                sec_roi_gray = cv2.cvtColor(sec_roi, cv2.COLOR_BGR2GRAY)
-                ret, sec_roi_thresh = cv2.threshold(sec_roi_gray, 150, 255, cv2.THRESH_BINARY)
-                # show_img('Second ROI', sec_roi_thresh)
-
-                # 透過累加器取出黑色pixel最多的列   
-                max_acc = 0
-                for i in range(sec_roi_thresh.shape[0]):
-                    acc = 0
-                    for j in range(sec_roi_thresh.shape[1]):
-                        if sec_roi_thresh[i][j] == 0:
-                            acc += 1
-                    if acc > max_acc:
-                        max_acc = acc
-                        value_pos = i
-
-                value_pos += sec_roi_min_y
-                value_list.append([int(value_text), value_pos])
-
-    min_x = min(value_xlist)
-    max_x = max(value_xlist)
-
-    if meter['class'] == 7:
-        # 方形電表避免截到黑色區域 進一步限制polar_image的長
-        min_y = get_polar_coord(img, center_coord, [center_coord[0] - 5, center_coord[1] + 1])[0]
-        max_y = get_polar_coord(img, center_coord, [center_coord[0] + 1, center_coord[1] - 5])[0]
-
-    elif meter['class'] == 8:
-        # 圓形電表抓原本的長就好
-        min_y = 0
-        max_y = polar_img.shape[0]
-
-    # 截出感興趣的區域
-    polar_crop = polar_img[min_y:max_y, min_x:max_x + (max_x - min_x)]
-    polar_gray = cv2.cvtColor(polar_crop, cv2.COLOR_BGR2GRAY)
-    ret, polar_thresh = cv2.threshold(polar_gray, 150, 255, cv2.THRESH_BINARY)
-    # show_img('Polar thresh', polar_thresh)
-    
-    # 透過累加器取出黑色pixel最多的列
-    max_acc = 0
-    for i in range(polar_thresh.shape[0]):
-        acc = 0
-        for j in range(polar_thresh.shape[1]):
-            if polar_thresh[i][j] == 0:
-                acc += 1
-        if acc > max_acc:
-            max_acc = acc
-            pointer_pos = i
-
-    cv2.line(polar_crop, (0, pointer_pos), (polar_crop.shape[1], pointer_pos), (255, 0, 0), 2)
-
-    for i in range(len(value_list)):
-        # 根據感興趣的區塊對數值物件的Y軸位置做校正
-        value_list[i][1] -= min_y
-        cv2.line(polar_crop, (0, value_list[i][1]), (polar_crop.shape[1], value_list[i][1]), (0, 255, 0), 2)
-        cv2.putText(polar_crop, '{}'.format(str(value_list[i][0])), (0, value_list[i][1]), cv2.FONT_HERSHEY_SIMPLEX, .8, (0, 255, 0), 1, cv2.LINE_AA)
-
-    return polar_crop, pointer_pos, value_list
-
-
-def get_polar_img(img, center_coord):
+def get_polar_img(img, obj, center_coord):
     height, width, _ = img.shape
+    dist = center_coord[1] - obj['coord'][1]
 
     # 圖片逆時針90度
     img_rotate = cv2.transpose(img)
@@ -195,47 +109,98 @@ def get_polar_img(img, center_coord):
     # 圓心座標逆時針90度
     center_coord_rotate = [center_coord[1], width - center_coord[0]]
 
-    polar_img = cv2.linearPolar(img_rotate, (center_coord_rotate[0], center_coord_rotate[1]), max(width, height), cv2.INTER_LINEAR)
-    # show_img('Polar image', polar_img)
+    # 極座標轉換 空的部分補上白色
+    polar_img = cv2.linearPolar(img_rotate, (center_coord_rotate[0], center_coord_rotate[1]), dist, cv2.INTER_LINEAR)
+    polar_img[np.where((polar_img == [0, 0, 0]).all(axis=2))] = [255, 255, 255]
+
+    # 方形電表取其90~180度
+    if obj['class'] == 7:
+        top = polar_img.shape[0] // 4
+        bottom = polar_img.shape[0] // 2
+        polar_img = polar_img[top:bottom,]
+
     return polar_img
 
 
-def get_polar_coord(img, center_coord, coord):
-    height, width, _ = img.shape
+def get_pointer(obj, polar_img):
+    polar_gray = cv2.cvtColor(polar_img, cv2.COLOR_BGR2GRAY)
+    ret, polar_binary = cv2.threshold(polar_gray, 150, 255, cv2.THRESH_BINARY)
 
-    # 座標逆時針90度
-    coord_rotate = [coord[1], width - coord[0]]
+    # 透過累加器取出黑色pixel最多的列
+    acc_max = 0
+    for i in range(polar_binary.shape[0]):
+        acc = 0
+        for j in range(polar_binary.shape[1]):
+            if polar_binary[i][j] == 0:
+                acc += 1
+        if acc > acc_max:
+            acc_max = acc
+            pointer_pos = i
 
-    # 圓心座標逆時針90度
-    center_coord_rotate = [center_coord[1], width - center_coord[0]]
+    # 不同的電表有不同的角度計算範圍
+    if obj['class'] == 7:
+        pointer_angle = (pointer_pos / polar_img.shape[0]) * 90 + 90
+    elif obj['class'] == 8:
+        pointer_angle = (pointer_pos / polar_img.shape[0]) * 360
 
-    # 計算轉換後的坐標
-    rho = (((coord_rotate[0] - center_coord_rotate[0]) ** 2) + ((coord_rotate[1] - center_coord_rotate[1]) ** 2)) ** 0.5
-    angle = int((np.degrees(np.arctan2((coord_rotate[1] - center_coord_rotate[1]), (coord_rotate[0] - center_coord_rotate[0]))) + 360) % 360)
-    polar_coord = [int(height * (angle / 360)), int(rho)]
-    return polar_coord
+    cv2.line(polar_img, (0, pointer_pos), (polar_img.shape[1], pointer_pos), (255, 0, 0), 2)
+    show_img('Pointer', polar_img)
 
+    return pointer_angle, polar_img
+
+def get_values(img, obj_list, center_coord, pointer_angle):
+    value_list = []
+    for obj in obj_list:
+        # 若物件類別為數值才做計算
+        if obj['class'] == 0:
+            value_img = img[obj['coord'][1]:obj['coord'][3], obj['coord'][0]:obj['coord'][2]]
+            value_text = digit_ocr(value_img)
+
+            # 文字內容為數字才做計算
+            if(value_text.isdigit()):
+                pts = [
+                    [obj['coord'][0], obj['coord'][1]],
+                    [obj['coord'][0], obj['coord'][3]],
+                    [obj['coord'][2], obj['coord'][1]],
+                    [obj['coord'][2], obj['coord'][3]]
+                ]
+                
+                # 計算數值物件四個角與圓心的角度
+                angles = []
+                for i in range(4):
+                    rho = (((pts[i][0] - center_coord[0]) ** 2) + ((pts[i][1] - center_coord[1]) ** 2)) ** 0.5
+                    angle = (np.degrees(np.arctan2((pts[i][1] - center_coord[1]), (pts[i][0] - center_coord[0]))) + 270) % 360
+                    angles.append(angle)
+                angle_max = max(angles)
+                angle_min = min(angles)
+
+                # 若指針角度落在其之間則忽略此數值
+                if pointer_angle < angle_max and pointer_angle > angle_min:
+                    continue
+
+                # 計算數值物件中心與圓心的角度
+                value_coord = [(obj['coord'][0] + obj['coord'][2]) // 2, (obj['coord'][1] + obj['coord'][3]) // 2]
+                rho = (((value_coord[0] - center_coord[0]) ** 2) + ((value_coord[1] - center_coord[1]) ** 2)) ** 0.5
+                angle = (np.degrees(np.arctan2((value_coord[1] - center_coord[1]), (value_coord[0] - center_coord[0]))) + 270) % 360
+
+                value = float(value_text)
+                value_list.append([value, angle])
+
+    return(value_list)
 
 def meter_read(img, obj_list):  
     for obj in obj_list:
         if obj['class'] in [7, 8]:
             # 獲取指針、圓若物件類別為電表
-            meter = obj
             center_img, center_coord = get_center(img, obj, obj_list)
-            polar_img = get_polar_img(img, center_coord)
-            polar_crop, pointer_pos, value_list = get_pointer_values(meter, img, polar_img, obj_list, center_coord)
-
-            # 指針跟刻度位置一樣的就刪掉
-            for i in range(len(value_list)):
-                if value_list[i][1] == pointer_pos:
-                    del value_list[i]
-                    break
+            polar_img = get_polar_img(img, obj, center_coord)
+            pointer_angle, polar_img = get_pointer(obj, polar_img)
+            value_list = get_values(img, obj_list, center_coord, pointer_angle)
 
             # 將指針加入value_list中
-            value0 = [None, pointer_pos]
+            value0 = [None, pointer_angle]
             value_list.append(value0)
             value_list = sorted(value_list, key=itemgetter(1))
-            print(value_list)
 
             for i in range(len(value_list)):
                 if value_list[i][1] == value0[1]:
@@ -249,17 +214,14 @@ def meter_read(img, obj_list):
                         value1 = value_list[i - 1]
                         value2 = value_list[i + 1]
 
-            scale_per_pixel = (value2[0] - value1[0]) / (value2[1] - value1[1])
-            value0 = [value2[0] + (pointer_pos - value2[1]) * scale_per_pixel, pointer_pos]
+            scale_per_degree = (value2[0] - value1[0]) / (value2[1] - value1[1])
+            value0 = [value2[0] + (pointer_angle - value2[1]) * scale_per_degree, pointer_angle]
             value0[0] = value0[0] if value0[0] > 0 else 0
             
-            print(value1, value2, value0)
-            cv2.putText(polar_crop, '{}'.format(str(round(value0[0], 2))), (0, value0[1]), cv2.FONT_HERSHEY_SIMPLEX, .8, (255, 0, 0), 1, cv2.LINE_AA)
-            show_img('Polar crop', polar_crop)
-            # 只取一個電表
-            break  
+            print(value1, value2, value0)     
 
-    return center_img, polar_crop
+            return value0, img, center_img, polar_img
+    return None 
 
 
 def main(_argv):
@@ -325,21 +287,26 @@ def main(_argv):
         x2 = int(box[3] * original_image.shape[1])
         obj_class = int(classes.numpy()[0][i])
         obj_list.append({'class': obj_class, 'coord': [x1, y1, x2, y2]})
-        
-    center_img, polar_crop = meter_read(original_image, obj_list)
+    
+    try:
+        value0, img, center_img, polar_img = meter_read(original_image, obj_list)
 
-    image = utils.draw_bbox(original_image, pred_bbox)
-    # image = utils.draw_bbox(image_data*255, pred_bbox)
-    image = Image.fromarray(image.astype(np.uint8))
-
-    plt.subplot(1, 3, 1)
-    plt.imshow(image)
-    plt.subplot(1, 3, 2)
-    plt.imshow(center_img)
-    plt.subplot(1, 3, 3)
-    plt.imshow(polar_crop)
-    plt.savefig('result.png', dpi=300)
-    plt.show()
+        plt.subplot(1, 3, 1)
+        plt.title('value: {}'.format(str(round(value0[0], 2))))
+        plt.axis('off')
+        plt.imshow(img)
+        plt.subplot(1, 3, 2)
+        plt.title('center')
+        plt.axis('off')
+        plt.imshow(center_img)
+        plt.subplot(1, 3, 3)
+        plt.title('angle: {}'.format(str(round(value0[1], 2))))
+        plt.axis('off')
+        plt.imshow(polar_img)
+        plt.savefig('result.png', dpi=300)
+        plt.show()
+    except:
+        print("辨識失敗")
 
 if __name__ == '__main__':
     try:
