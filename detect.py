@@ -43,7 +43,7 @@ def show_img(title, img):
 def digit_ocr(img):
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     ret, thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY)
-    text = pytesseract.image_to_string(thresh, lang='eng', config='--psm 6 --oem 3 -c tessedit_char_whitelist=0123456789').strip()
+    text = pytesseract.image_to_string(thresh, lang='eng', config='--psm 8 --oem 3 -c tessedit_char_whitelist=0123456789').strip()
     # show_img('Thresh', thresh)
     # print(text)
     return(text)
@@ -111,7 +111,7 @@ def get_polar_img(img, obj, center_coord):
 
     # 極座標轉換 空的部分補上白色
     polar_img = cv2.linearPolar(img_rotate, (center_coord_rotate[0], center_coord_rotate[1]), dist, cv2.INTER_LINEAR)
-    polar_img[np.where((polar_img == [0, 0, 0]).all(axis=2))] = [255, 255, 255]
+    # polar_img[np.where((polar_img == [0, 0, 0]).all(axis=2))] = [255, 255, 255]
 
     # 方形電表取其90~180度
     if obj['class'] == 7:
@@ -202,6 +202,7 @@ def meter_read(img, obj_list):
             value_list.append(value0)
             value_list = sorted(value_list, key=itemgetter(1))
 
+            # 取離指針最近得兩個刻度作為角度法的參考值
             for i in range(len(value_list)):
                 if value_list[i][1] == value0[1]:
                     if i == 0:
@@ -214,6 +215,7 @@ def meter_read(img, obj_list):
                         value1 = value_list[i - 1]
                         value2 = value_list[i + 1]
 
+            # 角度法計算
             scale_per_degree = (value2[0] - value1[0]) / (value2[1] - value1[1])
             value0 = [value2[0] + (pointer_angle - value2[1]) * scale_per_degree, pointer_angle]
             value0[0] = value0[0] if value0[0] > 0 else 0
@@ -292,21 +294,22 @@ def main(_argv):
         value0, img, center_img, polar_img = meter_read(original_image, obj_list)
 
         plt.subplot(1, 3, 1)
-        plt.title('value: {}'.format(str(round(value0[0], 2))))
-        plt.axis('off')
-        plt.imshow(img)
-        plt.subplot(1, 3, 2)
         plt.title('center')
         plt.axis('off')
         plt.imshow(center_img)
-        plt.subplot(1, 3, 3)
+        plt.subplot(1, 3, 2)
         plt.title('angle: {}'.format(str(round(value0[1], 2))))
         plt.axis('off')
         plt.imshow(polar_img)
+        plt.subplot(1, 3, 3)
+        plt.title('value: {}'.format(str(round(value0[0], 2))))
+        plt.axis('off')
+        plt.imshow(img)
         plt.savefig('result.png', dpi=300)
         plt.show()
-    except:
-        print("辨識失敗")
+    except Exception as e:
+        print("辨識失敗: {}".format(e))
+        # print([obj['class'] for obj in obj_list])
 
 if __name__ == '__main__':
     try:
